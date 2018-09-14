@@ -10,7 +10,7 @@ You need `go` to build from the scratch:
 go install github.com/dimuls/bandcamp-download
 ```
 
-Or you can download binary it from (releases page)[https://github.com/dimuls/bandcamp-download/releases] and put it to your PATH.
+Or you can download binary it from [releases page](https://github.com/dimuls/bandcamp-download/releases) and put it to your PATH.
 
 ## How to use?
 
