@@ -24,7 +24,7 @@ func main() {
 	app.Name = "bandcamp-download"
 	app.Author = "Vadim Chernov"
 	app.Email = "dimuls@yandex.ru"
-	app.Version = "0.0.1"
+	app.Version = "0.1"
 
 	commonFlags := []cli.Flag{
 		cli.StringFlag{
