@@ -123,6 +123,11 @@ type Track struct {
 }
 
 func downloadAlbum(url string, rootPath string) {
+
+	/*
+		Downloading album page and parsing it.
+	*/
+
 	logrus.WithField("URL", url).Info("Downloading album page")
 
 	resp, err := http.Get(url)
@@ -158,6 +163,10 @@ func downloadAlbum(url string, rootPath string) {
 		logrus.WithError(err).Fatal("Failed to unmarshal album JSON")
 	}
 
+	/*
+		Checking everything is ok.
+	*/
+
 	logrus.Info("Checking everything is ok")
 
 	if album.Current.Title == "" {
@@ -178,6 +187,10 @@ func downloadAlbum(url string, rootPath string) {
 		return
 	}
 
+	/*
+		Preparing album year string.
+	*/
+
 	var albumYear string
 
 	if album.ReleaseDate != "" {
@@ -192,6 +205,10 @@ func downloadAlbum(url string, rootPath string) {
 		albumYear = strconv.Itoa(releaseTime.Year())
 	}
 
+	/*
+		Creating artist and album paths.
+	*/
+
 	albumPath := path.Join(rootPath, album.Artist,
 		strings.TrimSpace(albumYear+" "+album.Current.Title))
 
@@ -199,10 +216,21 @@ func downloadAlbum(url string, rootPath string) {
 
 	os.MkdirAll(albumPath, 0755)
 
+	/*
+		Working with tracks.
+	*/
+
 	for _, t := range album.Tracks {
+
+		// Sometimes we can get track number 0. Check if single track in album
+		// and set track number to 1 if so.
 		if t.Number == 0 && len(album.Tracks) == 1 {
 			t.Number = 1
 		}
+
+		/*
+			Downloading track.
+		*/
 
 		if t.File.MP3128 == "" {
 			logrus.WithFields(logrus.Fields{
@@ -220,6 +248,10 @@ func downloadAlbum(url string, rootPath string) {
 		}
 		defer resp.Body.Close()
 
+		/*
+			Creating track's mp3 file.
+		*/
+
 		filePath := path.Join(albumPath, strconv.Itoa(t.Number)+" "+t.Title+".mp3")
 
 		logrus.WithField("path", filePath).Info("Creating track file")
@@ -230,6 +262,10 @@ func downloadAlbum(url string, rootPath string) {
 		}
 
 		logrus.WithField("URL", t.File.MP3128).Info("Downloading track")
+
+		/*
+			Copy track's  downloaded body to created mp3 file.
+		*/
 
 		_, err = io.Copy(out, resp.Body)
 		if err != nil {
@@ -242,6 +278,10 @@ func downloadAlbum(url string, rootPath string) {
 		}
 
 		out.Close()
+
+		/*
+			Taggin track's mp3 file with metadata: artist, album, year, etc...
+		*/
 
 		if albumYear == "" {
 			albumYear = "0"
@@ -277,6 +317,10 @@ func downloadAlbum(url string, rootPath string) {
 			logrus.Error(stderr.String())
 		}
 	}
+
+	/*
+		Downloading arwork.
+	*/
 
 	logrus.Info("Downloading artwork")
 
