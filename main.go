@@ -188,8 +188,8 @@ func downloadAlbum(url string, rootPath string) {
 				"Album.Current.Title": album.Current.Title,
 				"Album.ReleaseDate":   album.ReleaseDate,
 			}).Fatal("Failed to parse album release date")
-			albumYear = strconv.Itoa(releaseTime.Year())
 		}
+		albumYear = strconv.Itoa(releaseTime.Year())
 	}
 
 	albumPath := path.Join(rootPath, album.Artist,
