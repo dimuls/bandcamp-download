@@ -24,7 +24,7 @@ USAGE:
    bandcamp-download [global options] command [command options] [arguments...]
 
 VERSION:
-   0.0.1
+   0.1
 
 AUTHOR:
    Vadim Chernov <dimuls@yandex.ru>
