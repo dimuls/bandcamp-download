@@ -319,7 +319,7 @@ func downloadAlbum(url string, rootPath string) {
 	}
 
 	/*
-		Downloading arwork.
+		Downloading album cover.
 	*/
 
 	logrus.Info("Downloading artwork")
