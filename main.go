@@ -196,7 +196,8 @@ func downloadAlbum(url string, rootPath string) {
 	var albumYear string
 
 	if album.ReleaseDate != "" {
-		releaseTime, err := time.Parse("02 Jan 2006 15:04:05 MST", album.ReleaseDate)
+		releaseTime, err := time.Parse("02 Jan 2006 15:04:05 MST",
+			album.ReleaseDate)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"Album.Artist":        album.Artist,
@@ -254,13 +255,15 @@ func downloadAlbum(url string, rootPath string) {
 			Creating track's mp3 file.
 		*/
 
-		filePath := path.Join(albumPath, strconv.Itoa(t.Number)+" "+t.Title+".mp3")
+		filePath := path.Join(albumPath, strconv.Itoa(t.Number)+" "+
+			t.Title+".mp3")
 
 		logrus.WithField("path", filePath).Info("Creating track file")
 
 		out, err := os.Create(filePath)
 		if err != nil {
-			logrus.WithField("filePath", filePath).Fatal("Failed to open track file")
+			logrus.WithField("filePath", filePath).
+				Fatal("Failed to open track file")
 		}
 
 		logrus.WithField("URL", t.File.MP3128).Info("Downloading track")
@@ -326,7 +329,8 @@ func downloadAlbum(url string, rootPath string) {
 
 	logrus.Info("Downloading artwork")
 
-	coverURL := "https://f4.bcbits.com/img/a" + strconv.Itoa(album.ArtworkID) + "_10.jpg"
+	coverURL := "https://f4.bcbits.com/img/a" +
+		strconv.Itoa(album.ArtworkID) + "_10.jpg"
 
 	resp, err = http.Get(coverURL)
 	if err != nil {
@@ -341,11 +345,13 @@ func downloadAlbum(url string, rootPath string) {
 
 	coverPath := path.Join(albumPath, "cover.jpg")
 
-	logrus.WithField("path", coverPath).Info("Creating album cover file")
+	logrus.WithField("path", coverPath).
+		Info("Creating album cover file")
 
 	out, err := os.Create(coverPath)
 	if err != nil {
-		logrus.WithField("coverPath", coverPath).Error("Failed to open album cover file")
+		logrus.WithField("coverPath", coverPath).
+			Error("Failed to open album cover file")
 		return
 	}
 	defer out.Close()
