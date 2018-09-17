@@ -2,6 +2,16 @@
 
 Download your favorite artist albums or a single album using `bandcamp-download`.
 
+## `eyeD3` dependency
+
+I couldn't find id3 v2.4 tagger library on go, so i decided to use external tool.
+You need to install eyeD3:
+```bash
+apt install eyed3
+```
+
+But if you do not need tagging you can skip this.
+
 ## How to install?
 
 You need `go` to build from the scratch:
@@ -40,7 +50,7 @@ GLOBAL OPTIONS:
 ```
 
 Also available:
-```
+```bash
 ./bandcamp-download album -h
 ./bandcamp-download albums -h
 ```
