@@ -22,6 +22,8 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "bandcamp-download"
+	app.Usage = ""
+	app.Description = "Tool for download album or albums from bandcamp.com."
 	app.Author = "Vadim Chernov"
 	app.Email = "dimuls@yandex.ru"
 	app.Version = "0.1"
