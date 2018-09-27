@@ -22,3 +22,7 @@ release:
 # This is required for building windows binaries from linux.
 install-windows-dependencies:
 	GOOS=windows go get github.com/konsorten/go-windows-terminal-sequences
+
+.PHONY: \
+	release \
+	install-windows-dependencies
