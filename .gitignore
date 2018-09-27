@@ -18,3 +18,5 @@ bandcamp-download
 *.upx
 *.tar.gz
 *.zip
+
+release/
