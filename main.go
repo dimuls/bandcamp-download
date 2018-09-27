@@ -1,19 +1,19 @@
 package main
 
 import (
-	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/bogem/id3v2"
 	"github.com/sirupsen/logrus"
 	"github.com/yosuke-furukawa/json5/encoding/json5"
 	"gopkg.in/urfave/cli.v1"
@@ -106,23 +106,26 @@ func fixAlbumJSON(albumJSON string) string {
 	return albumJSON
 }
 
-type Album struct {
+type album struct {
 	Current struct {
 		Title string
 	}
 	Artist      string
 	ReleaseDate string  `json:"album_release_date"`
 	ArtworkID   int     `json:"art_id"`
-	Tracks      []Track `json:"trackinfo"`
+	Tracks      []track `json:"trackinfo"`
 }
 
-type Track struct {
+type track struct {
 	Number int `json:"track_num"`
 	Title  string
 	File   struct {
 		MP3128 string `json:"mp3-128"`
 	}
 }
+
+// id3 v2.4 track frame ID.
+const trackFrameID = "TRCK"
 
 func downloadAlbum(url string, rootPath string) {
 
@@ -155,12 +158,12 @@ func downloadAlbum(url string, rootPath string) {
 		logrus.WithError(err).Fatal("Failed to extract album data")
 	}
 
-	var album Album
+	var a album
 
 	logrus.Info("Unmarshaling album JSON")
 	logrus.Debug(albumJSON)
 
-	err = json5.Unmarshal([]byte(albumJSON), &album)
+	err = json5.Unmarshal([]byte(albumJSON), &a)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to unmarshal album JSON")
 	}
@@ -171,20 +174,20 @@ func downloadAlbum(url string, rootPath string) {
 
 	logrus.Info("Checking everything is ok")
 
-	if album.Current.Title == "" {
-		logrus.WithField("Album.Artist", album.Artist).
+	if a.Current.Title == "" {
+		logrus.WithField("album.Artist", a.Artist).
 			Fatal("Album without title detected")
 	}
 
-	if album.Artist == "" {
-		logrus.WithField("Album.Current.Title", album.Current.Title).
+	if a.Artist == "" {
+		logrus.WithField("album.Current.Title", a.Current.Title).
 			Fatal("Album without artist detected")
 	}
 
-	if len(album.Tracks) == 0 {
+	if len(a.Tracks) == 0 {
 		logrus.WithFields(logrus.Fields{
-			"Album.Artist":        album.Artist,
-			"Album.Current.Title": album.Current.Title,
+			"album.Artist":        a.Artist,
+			"album.Current.Title": a.Current.Title,
 		}).Info("Album without tracks detected")
 		return
 	}
@@ -195,14 +198,14 @@ func downloadAlbum(url string, rootPath string) {
 
 	var albumYear string
 
-	if album.ReleaseDate != "" {
+	if a.ReleaseDate != "" {
 		releaseTime, err := time.Parse("02 Jan 2006 15:04:05 MST",
-			album.ReleaseDate)
+			a.ReleaseDate)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
-				"Album.Artist":        album.Artist,
-				"Album.Current.Title": album.Current.Title,
-				"Album.ReleaseDate":   album.ReleaseDate,
+				"album.Artist":        a.Artist,
+				"album.Current.Title": a.Current.Title,
+				"album.ReleaseDate":   a.ReleaseDate,
 			}).Fatal("Failed to parse album release date")
 		}
 		albumYear = strconv.Itoa(releaseTime.Year())
@@ -212,8 +215,8 @@ func downloadAlbum(url string, rootPath string) {
 		Creating artist and album paths.
 	*/
 
-	albumPath := path.Join(rootPath, album.Artist,
-		strings.TrimSpace(albumYear+" "+album.Current.Title))
+	albumPath := path.Join(rootPath, a.Artist,
+		strings.TrimSpace(albumYear+" "+a.Current.Title))
 
 	logrus.WithField("path", albumPath).Info("Creating album path")
 
@@ -223,11 +226,11 @@ func downloadAlbum(url string, rootPath string) {
 		Working with tracks.
 	*/
 
-	for _, t := range album.Tracks {
+	for _, t := range a.Tracks {
 
 		// Sometimes we can get track number 0. Check if single track in album
 		// and set track number to 1 if so.
-		if t.Number == 0 && len(album.Tracks) == 1 {
+		if t.Number == 0 && len(a.Tracks) == 1 {
 			t.Number = 1
 		}
 
@@ -237,16 +240,16 @@ func downloadAlbum(url string, rootPath string) {
 
 		if t.File.MP3128 == "" {
 			logrus.WithFields(logrus.Fields{
-				"Album.Artist":        album.Artist,
-				"Album.Current.Title": album.Current.Title,
-				"Track.Number":        t.Number,
-				"Track.Title":         t.Title,
+				"album.Artist":        a.Artist,
+				"album.Current.Title": a.Current.Title,
+				"track.Number":        t.Number,
+				"track.Title":         t.Title,
 			}).Fatal("Track without MP3128 detected")
 		}
 
 		resp, err := http.Get(t.File.MP3128)
 		if err != nil {
-			logrus.WithField("Track.File.MP3128", t.File.MP3128).
+			logrus.WithField("track.File.MP3128", t.File.MP3128).
 				Fatal("Failed to download track MP3 file")
 		}
 		defer resp.Body.Close()
@@ -275,10 +278,10 @@ func downloadAlbum(url string, rootPath string) {
 		_, err = io.Copy(out, resp.Body)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
-				"Album.Artist":        album.Artist,
-				"Album.Current.Title": album.Current.Title,
-				"Track.Number":        t.Number,
-				"Track.Title":         t.Title,
+				"album.Artist":        a.Artist,
+				"album.Current.Title": a.Current.Title,
+				"track.Number":        t.Number,
+				"track.Title":         t.Title,
 			}).Fatal("Failed to copy track from body to file")
 		}
 
@@ -288,38 +291,36 @@ func downloadAlbum(url string, rootPath string) {
 			Taggin track's mp3 file with metadata: artist, album, year, etc...
 		*/
 
-		if albumYear == "" {
-			albumYear = "0"
-		}
+		logrus.Info("Tagging mp3 file with metadata")
 
-		// We depending on external tool eyeD3. Install it using `apt install eyed3`.
-
-		cmd := exec.Command("/bin/sh", "-c", "command -v eyeD3")
-		if err := cmd.Run(); err != nil {
-			// We do not have eyeD3 installed so we can't tag mp3. Skipping it.
-			logrus.Info("Can't tag mp3 due to absence of eyeD3 app, skipping")
+		mp3, err := id3v2.Open(filePath, id3v2.Options{})
+		if err != nil {
+			logrus.WithError(err).WithField("filePath", filePath).Error(
+				"Failed to open mp3 file")
 			continue
 		}
 
-		logrus.Info("Tagging mp3 file using eyeD3 app")
+		mp3.SetArtist(a.Artist)
+		mp3.SetAlbum(a.Current.Title)
+		mp3.SetTitle(t.Title)
 
-		cmd = exec.Command("eyeD3",
-			"-a", album.Artist,
-			"-A", album.Current.Title,
-			"-Y", albumYear,
-			"-n", strconv.Itoa(t.Number),
-			"-N", strconv.Itoa(len(album.Tracks)),
-			"-t", t.Title,
-			"-c", "Downloaded by bandcamp-download",
-			filePath)
+		if albumYear != "" {
+			mp3.SetYear(albumYear)
+		}
 
-		var stderr bytes.Buffer
-		cmd.Stderr = &stderr
+		mp3.AddCommentFrame(id3v2.CommentFrame{
+			Encoding: id3v2.EncodingUTF8,
+			Language: "eng",
+			Text:     "Downloaded by bandcamp-download",
+		})
 
-		err = cmd.Run()
+		mp3.AddFrame(trackFrameID, id3v2.TextFrame{Encoding: id3v2.EncodingUTF8,
+			Text: fmt.Sprintf("%d/%d", t.Number, len(a.Tracks))})
+
+		err = mp3.Save()
 		if err != nil {
-			logrus.WithError(err).Error("Failed to run eyeD3 tagger")
-			logrus.Error(stderr.String())
+			logrus.WithError(err).Error("Failed to save tagged mp3 file")
+			continue
 		}
 	}
 
@@ -330,13 +331,13 @@ func downloadAlbum(url string, rootPath string) {
 	logrus.Info("Downloading artwork")
 
 	coverURL := "https://f4.bcbits.com/img/a" +
-		strconv.Itoa(album.ArtworkID) + "_10.jpg"
+		strconv.Itoa(a.ArtworkID) + "_10.jpg"
 
 	resp, err = http.Get(coverURL)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
-			"Album.Artist":        album.Artist,
-			"Album.Current.Title": album.Current.Title,
+			"album.Artist":        a.Artist,
+			"album.Current.Title": a.Current.Title,
 			"coverURL":            coverURL,
 		}).Error("Failed to download album cover")
 		return
@@ -359,8 +360,8 @@ func downloadAlbum(url string, rootPath string) {
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
-			"Album.Artist":        album.Artist,
-			"Album.Current.Title": album.Current.Title,
+			"album.Artist":        a.Artist,
+			"album.Current.Title": a.Current.Title,
 			"coverURL":            coverURL,
 		}).Error("Failed to copy album cover from body to file")
 	}
