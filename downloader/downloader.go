@@ -97,7 +97,8 @@ func DownloadAlbum(url string, rootPath string) {
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logrus.WithError(err).Fatal("Failed to read body")
+		logrus.WithError(err).Error("Failed to read body")
+		return
 	}
 
 	body := string(bodyBytes)
@@ -106,7 +107,8 @@ func DownloadAlbum(url string, rootPath string) {
 
 	albumJSON, err := extractAlbumJSON(body)
 	if err != nil {
-		logrus.WithError(err).Fatal("Failed to extract album data")
+		logrus.WithError(err).Error("Failed to extract album data")
+		return
 	}
 
 	var a album
@@ -116,7 +118,8 @@ func DownloadAlbum(url string, rootPath string) {
 
 	err = json5.Unmarshal([]byte(albumJSON), &a)
 	if err != nil {
-		logrus.WithError(err).Fatal("Failed to unmarshal album JSON")
+		logrus.WithError(err).Error("Failed to unmarshal album JSON")
+		return
 	}
 
 	/*
@@ -127,12 +130,14 @@ func DownloadAlbum(url string, rootPath string) {
 
 	if a.Current.Title == "" {
 		logrus.WithField("album.Artist", a.Artist).
-			Fatal("Album without title detected")
+			Error("Album without title detected")
+		return
 	}
 
 	if a.Artist == "" {
 		logrus.WithField("album.Current.Title", a.Current.Title).
-			Fatal("Album without artist detected")
+			Error("Album without artist detected")
+		return
 	}
 
 	if len(a.Tracks) == 0 {
@@ -157,7 +162,8 @@ func DownloadAlbum(url string, rootPath string) {
 				"album.Artist":        a.Artist,
 				"album.Current.Title": a.Current.Title,
 				"album.ReleaseDate":   a.ReleaseDate,
-			}).Fatal("Failed to parse album release date")
+			}).Error("Failed to parse album release date")
+			return
 		}
 		albumYear = strconv.Itoa(releaseTime.Year())
 	}
@@ -195,13 +201,15 @@ func DownloadAlbum(url string, rootPath string) {
 				"album.Current.Title": a.Current.Title,
 				"track.Number":        t.Number,
 				"track.Title":         t.Title,
-			}).Fatal("Track without MP3128 detected")
+			}).Error("Track without MP3128 detected")
+			return
 		}
 
 		resp, err := http.Get(t.File.MP3128)
 		if err != nil {
 			logrus.WithField("track.File.MP3128", t.File.MP3128).
-				Fatal("Failed to download track MP3 file")
+				Error("Failed to download track MP3 file")
+			return
 		}
 		defer resp.Body.Close()
 
@@ -217,7 +225,8 @@ func DownloadAlbum(url string, rootPath string) {
 		out, err := os.Create(filePath)
 		if err != nil {
 			logrus.WithField("filePath", filePath).
-				Fatal("Failed to open track file")
+				Error("Failed to open track file")
+			return
 		}
 
 		logrus.WithField("URL", t.File.MP3128).Info("Downloading track")
@@ -233,7 +242,8 @@ func DownloadAlbum(url string, rootPath string) {
 				"album.Current.Title": a.Current.Title,
 				"track.Number":        t.Number,
 				"track.Title":         t.Title,
-			}).Fatal("Failed to copy track from body to file")
+			}).Error("Failed to copy track from body to file")
+			return
 		}
 
 		out.Close()
@@ -333,7 +343,8 @@ func DownloadAlbums(url string, rootPath string) {
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logrus.WithError(err).Fatal("Failed to read body")
+		logrus.WithError(err).Error("Failed to read body")
+		return
 	}
 
 	body := string(bodyBytes)
@@ -345,7 +356,8 @@ func DownloadAlbums(url string, rootPath string) {
 	match := re.FindStringSubmatch(body)
 
 	if len(match) == 0 {
-		logrus.Fatal("Can't find artist URL")
+		logrus.Error("Can't find artist URL")
+		return
 	}
 
 	artistURL := re.ReplaceAllString(match[0], "$1")
@@ -355,7 +367,8 @@ func DownloadAlbums(url string, rootPath string) {
 	matches := re.FindAllStringSubmatch(string(body), -1)
 
 	if len(match) == 0 {
-		logrus.Fatal("No album slugs found")
+		logrus.Error("No album slugs found")
+		return
 	}
 
 	for _, m := range matches {

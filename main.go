@@ -16,7 +16,7 @@ func main() {
 	app.Description = "Tool for download album or albums from bandcamp.com."
 	app.Author = "Vadim Chernov"
 	app.Email = "dimuls@yandex.ru"
-	app.Version = "0.3"
+	app.Version = "0.3.1"
 
 	commonFlags := []cli.Flag{
 		cli.StringFlag{
