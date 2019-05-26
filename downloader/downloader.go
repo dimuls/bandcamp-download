@@ -78,6 +78,129 @@ type track struct {
 // id3 v2.4 track frame ID.
 const trackFrameID = "TRCK"
 
+func downloadTrack(albumPath string, a album, albumYear string, t track) {
+
+	// Sometimes we can get track number 0. Check if single track in album
+	// and set track number to 1 if so.
+	if t.Number == 0 && len(a.Tracks) == 1 {
+		t.Number = 1
+	}
+
+	/*
+		Downloading track.
+	*/
+
+	if t.File.MP3128 == "" {
+		logrus.WithFields(logrus.Fields{
+			"album.Artist":        a.Artist,
+			"album.Current.Title": a.Current.Title,
+			"track.Number":        t.Number,
+			"track.Title":         t.Title,
+		}).Error("Track without MP3128 detected")
+		return
+	}
+
+	logrus.WithField("URL", t.File.MP3128).
+		Info("Downloading track")
+
+	resp, err := http.Get(t.File.MP3128)
+	if err != nil {
+		logrus.WithField("track.File.MP3128", t.File.MP3128).
+			Error("Failed to download track MP3 file")
+		return
+	}
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			logrus.WithError(err).Warn(
+				"Failed to close downloading track body")
+		}
+	}()
+
+	/*
+		Creating track's mp3 file.
+	*/
+
+	filePath := path.Join(albumPath, fmt.Sprintf("%02d %s.mp3",
+		t.Number, t.Title))
+
+	logrus.WithField("path", filePath).Info("Creating track file")
+
+	out, err := os.Create(filePath)
+	if err != nil {
+		logrus.WithField("filePath", filePath).
+			Error("Failed to open track file")
+		return
+	}
+
+	/*
+		Copying track's downloaded body to created mp3 file.
+	*/
+
+	logrus.Info("Copying track's downloaded body to created mp3 file")
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"album.Artist":        a.Artist,
+			"album.Current.Title": a.Current.Title,
+			"track.Number":        t.Number,
+			"track.Title":         t.Title,
+		}).Error("Failed to copy track from body to file")
+		return
+	}
+
+	err = out.Close()
+	if err != nil {
+		logrus.WithError(err).Warn("Failed to close track file")
+	}
+
+	/*
+		Tagging track's mp3 file with metadata: artist, album, year, etc...
+	*/
+
+	logrus.Info("Tagging mp3 file with metadata")
+
+	mp3, err := id3v2.Open(filePath, id3v2.Options{})
+	if err != nil {
+		logrus.WithError(err).WithField("filePath", filePath).Error(
+			"Failed to open mp3 file")
+		return
+	}
+	defer func() {
+		err = mp3.Close()
+		if err != nil {
+			logrus.WithError(err).
+				Warn("Failed to close mp3 file")
+		}
+	}()
+
+	mp3.SetVersion(4)
+
+	mp3.SetArtist(a.Artist)
+	mp3.SetAlbum(a.Current.Title)
+	mp3.SetTitle(t.Title)
+
+	if albumYear != "" {
+		mp3.SetYear(albumYear)
+	}
+
+	mp3.AddCommentFrame(id3v2.CommentFrame{
+		Encoding: id3v2.EncodingUTF8,
+		Language: "eng",
+		Text:     "Downloaded by bandcamp-download",
+	})
+
+	mp3.AddFrame(trackFrameID, id3v2.TextFrame{Encoding: id3v2.EncodingUTF8,
+		Text: fmt.Sprintf("%d/%d", t.Number, len(a.Tracks))})
+
+	err = mp3.Save()
+	if err != nil {
+		logrus.WithError(err).Error("Failed to save tagged mp3 file")
+		return
+	}
+}
+
 func DownloadAlbum(url string, rootPath string) {
 
 	/*
@@ -114,7 +237,6 @@ func DownloadAlbum(url string, rootPath string) {
 	var a album
 
 	logrus.Info("Unmarshaling album JSON")
-	logrus.Debug(albumJSON)
 
 	err = json5.Unmarshal([]byte(albumJSON), &a)
 	if err != nil {
@@ -144,7 +266,7 @@ func DownloadAlbum(url string, rootPath string) {
 		logrus.WithFields(logrus.Fields{
 			"album.Artist":        a.Artist,
 			"album.Current.Title": a.Current.Title,
-		}).Info("Album without tracks detected")
+		}).Error("Album without tracks detected")
 		return
 	}
 
@@ -177,119 +299,25 @@ func DownloadAlbum(url string, rootPath string) {
 
 	logrus.WithField("path", albumPath).Info("Creating album path")
 
-	os.MkdirAll(albumPath, 0755)
+	err = os.MkdirAll(albumPath, 0755)
+	if err != nil {
+		logrus.WithError(err).Error("Failed to create album path")
+		return
+	}
 
 	/*
-		Working with tracks.
+		Downloading tracks.
 	*/
 
 	for _, t := range a.Tracks {
-
-		// Sometimes we can get track number 0. Check if single track in album
-		// and set track number to 1 if so.
-		if t.Number == 0 && len(a.Tracks) == 1 {
-			t.Number = 1
-		}
-
-		/*
-			Downloading track.
-		*/
-
-		if t.File.MP3128 == "" {
-			logrus.WithFields(logrus.Fields{
-				"album.Artist":        a.Artist,
-				"album.Current.Title": a.Current.Title,
-				"track.Number":        t.Number,
-				"track.Title":         t.Title,
-			}).Error("Track without MP3128 detected")
-			return
-		}
-
-		resp, err := http.Get(t.File.MP3128)
-		if err != nil {
-			logrus.WithField("track.File.MP3128", t.File.MP3128).
-				Error("Failed to download track MP3 file")
-			return
-		}
-		defer resp.Body.Close()
-
-		/*
-			Creating track's mp3 file.
-		*/
-
-		filePath := path.Join(albumPath, fmt.Sprintf("%02d %s.mp3",
-			t.Number, t.Title))
-
-		logrus.WithField("path", filePath).Info("Creating track file")
-
-		out, err := os.Create(filePath)
-		if err != nil {
-			logrus.WithField("filePath", filePath).
-				Error("Failed to open track file")
-			return
-		}
-
-		logrus.WithField("URL", t.File.MP3128).Info("Downloading track")
-
-		/*
-			Copy track's  downloaded body to created mp3 file.
-		*/
-
-		_, err = io.Copy(out, resp.Body)
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"album.Artist":        a.Artist,
-				"album.Current.Title": a.Current.Title,
-				"track.Number":        t.Number,
-				"track.Title":         t.Title,
-			}).Error("Failed to copy track from body to file")
-			return
-		}
-
-		out.Close()
-
-		/*
-			Tagging track's mp3 file with metadata: artist, album, year, etc...
-		*/
-
-		logrus.Info("Tagging mp3 file with metadata")
-
-		mp3, err := id3v2.Open(filePath, id3v2.Options{})
-		if err != nil {
-			logrus.WithError(err).WithField("filePath", filePath).Error(
-				"Failed to open mp3 file")
-			continue
-		}
-
-		mp3.SetArtist(a.Artist)
-		mp3.SetAlbum(a.Current.Title)
-		mp3.SetTitle(t.Title)
-
-		if albumYear != "" {
-			mp3.SetYear(albumYear)
-		}
-
-		mp3.AddCommentFrame(id3v2.CommentFrame{
-			Encoding: id3v2.EncodingUTF8,
-			Language: "eng",
-			Text:     "Downloaded by bandcamp-download",
-		})
-
-		mp3.AddFrame(trackFrameID, id3v2.TextFrame{Encoding: id3v2.EncodingUTF8,
-			Text: fmt.Sprintf("%d/%d", t.Number, len(a.Tracks))})
-
-		err = mp3.Save()
-		if err != nil {
-			logrus.WithError(err).Error("Failed to save tagged mp3 file")
-			continue
-		}
+		downloadTrack(albumPath, a, albumYear, t)
 	}
 
 	/*
 		Downloading album cover.
 	*/
 
-	logrus.Info("Downloading artwork")
+	logrus.Info("Downloading album cover")
 
 	coverURL := "https://f4.bcbits.com/img/a" +
 		strconv.Itoa(a.ArtworkID) + "_10.jpg"
@@ -303,7 +331,13 @@ func DownloadAlbum(url string, rootPath string) {
 		}).Error("Failed to download album cover")
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			logrus.WithError(err).Warn(
+				"Failed to close album cover body")
+		}
+	}()
 
 	coverPath := path.Join(albumPath, "cover.jpg")
 
@@ -316,7 +350,13 @@ func DownloadAlbum(url string, rootPath string) {
 			Error("Failed to open album cover file")
 		return
 	}
-	defer out.Close()
+	defer func() {
+		err = out.Close()
+		if err != nil {
+			logrus.WithError(err).Warn(
+				"Failed to close album cover file")
+		}
+	}()
 
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
@@ -326,7 +366,6 @@ func DownloadAlbum(url string, rootPath string) {
 			"coverURL":            coverURL,
 		}).Error("Failed to copy album cover from body to file")
 	}
-
 }
 
 func DownloadAlbums(url string, rootPath string) {
@@ -375,7 +414,8 @@ func DownloadAlbums(url string, rootPath string) {
 		albumSlug := re.ReplaceAllString(m[0], "$1")
 		albumURL := artistURL + albumSlug
 
-		logrus.WithField("albumURL", albumURL).Info("Downloading album")
+		logrus.WithField("albumURL", albumURL).
+			Info("Downloading album")
 
 		DownloadAlbum(albumURL, rootPath)
 	}
