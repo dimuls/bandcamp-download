@@ -217,8 +217,8 @@ func DownloadAlbum(url string, rootPath string) {
 			Creating track's mp3 file.
 		*/
 
-		filePath := path.Join(albumPath, strconv.Itoa(t.Number)+" "+
-			t.Title+".mp3")
+		filePath := path.Join(albumPath, fmt.Sprintf("%02d %s.mp3",
+			t.Number, t.Title))
 
 		logrus.WithField("path", filePath).Info("Creating track file")
 
@@ -249,7 +249,7 @@ func DownloadAlbum(url string, rootPath string) {
 		out.Close()
 
 		/*
-			Taggin track's mp3 file with metadata: artist, album, year, etc...
+			Tagging track's mp3 file with metadata: artist, album, year, etc...
 		*/
 
 		logrus.Info("Tagging mp3 file with metadata")
