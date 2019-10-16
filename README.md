@@ -6,8 +6,8 @@ Download your favorite artist albums or a single album using `bandcamp-download`
 
 You need `go` to build from the scratch:
 
-```go
-go install github.com/dimuls/bandcamp-download
+```bash
+go get github.com/dimuls/bandcamp-download
 ```
 
 Or you can download binary from [releases page](https://github.com/dimuls/bandcamp-download/releases) and put it to your PATH.
