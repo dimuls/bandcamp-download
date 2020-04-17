@@ -121,8 +121,10 @@ func downloadTrack(albumPath string, a album, albumYear string, t track) {
 		Creating track's mp3 file.
 	*/
 
-	filePath := path.Join(albumPath, fmt.Sprintf("%02d %s.mp3",
-		t.Number, t.Title))
+	fileName := fmt.Sprintf("%02d %s.mp3", t.Number, t.Title)
+	fileName = strings.Replace(fileName, "/", "-", -1)
+
+	filePath := path.Join(albumPath, fileName)
 
 	logrus.WithField("path", filePath).Info("Creating track file")
 
